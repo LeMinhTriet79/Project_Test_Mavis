@@ -1,0 +1,157 @@
+version: "3.8"
+
+services:
+  fruit-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fruit_admin
+      POSTGRES_PASSWORD: fruit_secret_password
+      POSTGRES_DB: fruit_store_db
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fruit_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    expose:
+      - "5672"
+      - "15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-pricing-service:
+    image: eclipse-temurin:17-jre-alpine
+    build: ./fruit-pricing-service
+    working_dir: /app
+    expose:
+      - "8084"
+    environment:
+      SERVER_PORT: "8084"
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-catalog-service:
+    image: eclipse-temurin:17-jre-alpine
+    build: ./fruit-catalog-service
+    working_dir: /app
+    expose:
+      - "8082"
+    environment:
+      SERVER_PORT: "8082"
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://fruit-postgres:5432/fruit_catalog_db
+      SPRING_DATASOURCE_USERNAME: fruit_admin
+      SPRING_DATASOURCE_PASSWORD: fruit_secret_password
+      PRICING_SERVICE_URL: http://fruit-pricing-service:8084
+    depends_on:
+      - fruit-postgres
+      - fruit-pricing-service
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-payment-service:
+    image: eclipse-temurin:17-jre-alpine
+    build: ./fruit-payment-service
+    working_dir: /app
+    expose:
+      - "8083"
+    environment:
+      SERVER_PORT: "8083"
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://fruit-postgres:5432/fruit_payment_db
+      SPRING_DATASOURCE_USERNAME: fruit_admin
+      SPRING_DATASOURCE_PASSWORD: fruit_secret_password
+    depends_on:
+      - fruit-postgres
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-delivery-service:
+    image: eclipse-temurin:17-jre-alpine
+    build: ./fruit-delivery-service
+    working_dir: /app
+    expose:
+      - "8085"
+    environment:
+      SERVER_PORT: "8085"
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: fruit-rabbitmq
+      ORDER_CALLBACK_URL: http://fruit-order-service:8081/api/orders
+    depends_on:
+      - fruit-rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-order-service:
+    image: eclipse-temurin:17-jre-alpine
+    build: ./fruit-order-service
+    working_dir: /app
+    expose:
+      - "8081"
+    environment:
+      SERVER_PORT: "8081"
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://fruit-postgres:5432/fruit_order_db
+      SPRING_DATASOURCE_USERNAME: fruit_admin
+      SPRING_DATASOURCE_PASSWORD: fruit_secret_password
+      SPRING_RABBITMQ_HOST: fruit-rabbitmq
+      CATALOG_SERVICE_URL: http://fruit-catalog-service:8082
+      PAYMENT_SERVICE_URL: http://fruit-payment-service:8083
+      PRICING_SERVICE_URL: http://fruit-pricing-service:8084
+      DELIVERY_SERVICE_URL: http://fruit-delivery-service:8085
+    depends_on:
+      - fruit-postgres
+      - fruit-rabbitmq
+      - fruit-catalog-service
+      - fruit-payment-service
+      - fruit-pricing-service
+      - fruit-delivery-service
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fruit-api-gateway:
+    image: eclipse-temurin:17-jre-alpine
+    build: ./fruit-api-gateway
+    working_dir: /app
+    expose:
+      - "8080"
+    environment:
+      SERVER_PORT: "8080"
+      SPRING_PROFILES_ACTIVE: docker
+      ORDER_SERVICE_URL: http://fruit-order-service:8081
+      CATALOG_SERVICE_URL: http://fruit-catalog-service:8082
+      PRICING_SERVICE_URL: http://fruit-pricing-service:8084
+      DELIVERY_SERVICE_URL: http://fruit-delivery-service:8085
+    depends_on:
+      - fruit-order-service
+      - fruit-catalog-service
+      - fruit-pricing-service
+      - fruit-delivery-service
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

@@ -1,9 +1,0 @@
-server:
-  port: 8081
-spring:
-  application:
-    name: fruit-catalog-service
-  datasource:
-    url: jdbc:postgresql://catalog-db:5432/fruit_catalog_db
-    username: postgres
-    password: secret_catalog_db_password

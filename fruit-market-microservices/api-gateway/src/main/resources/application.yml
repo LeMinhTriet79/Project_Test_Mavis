@@ -1,9 +1,0 @@
-server:
-  port: 8080
-spring:
-  application:
-    name: api-gateway
-services:
-  catalog-url: http://fruit-catalog-service:8081
-  order-url: http://fruit-order-service:8083
-  delivery-url: http://fruit-delivery-service:8085

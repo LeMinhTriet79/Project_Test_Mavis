@@ -1,9 +1,0 @@
-server:
-  port: 8082
-spring:
-  application:
-    name: fruit-inventory-service
-  datasource:
-    url: jdbc:postgresql://inventory-db:5432/fruit_inventory_db
-    username: postgres
-    password: secret_inventory_db_password
